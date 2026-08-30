@@ -1,0 +1,569 @@
+---
+title: "Thesis Data Cleaning"
+author: "Yeon Suh"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r read LB data}
+LB22 <- read_sas("H22LB_R.sas7bdat")
+LB20 <- read_sas("H20LB_R.sas7bdat")
+LB18 <- read_sas("H18LB_R.sas7bdat")
+
+fn <- "H16LB_R.da" #call da dataset
+sas.input <- "H16LB_R.sas" #call sas dataset
+LB16 <- read.SAScii( fn , sas.input ) #read both
+
+fn <- "H14LB_R.da" #call da dataset
+sas.input <- "H14LB_R.sas" #call sas dataset
+LB14 <- read.SAScii( fn , sas.input ) #read both
+
+fn <- "H12LB_R.da" #call da dataset
+sas.input <- "H12LB_R.sas" #call sas dataset
+LB12 <- read.SAScii( fn , sas.input ) #read both
+```
+
+```{r}
+lbeftf1 <- LB22 %>%
+  full_join(LB18, by = c("HHID", "PN")) %>%
+  full_join(LB14, by = c("HHID", "PN"))
+
+lbeftf2 <- LB20 %>%
+  full_join(LB16, by = c("HHID", "PN")) %>%
+  full_join(LB12, by = c("HHID","PN"))
+
+saveRDS(lbeftf1, "lbeftf1.rds")
+saveRDS(lbeftf2, "lbeftf2.rds")
+```
+
+```{r}
+library(psych)
+library(dplyr)
+library(lavaan)
+library(SAScii) 
+library(haven)
+library(skimr)
+```
+
+```{r read TRACKER}
+#tracker = read_sas("TRK2022TR_R.sas7bdat")
+#saveRDS(tracker, "tracker.RDS")
+tracker = readRDS("tracker.RDS")
+```
+
+EFTFASSIGN               RESPONDENTS ASSIGNMENT FOR EFTF INTERVIEWS
+         Section: TR    Level: Respondent      Type: Numeric    Width: 1   Decimals: 0
+
+         .................................................................................
+         19782           1.  To receive enhanced face to face interview in 2006, 2010,
+                             2014, 2018, and 2022
+         18523           2.  To receive enhanced face to face interview in 2008, 2012,
+                             2016, 2020, and 2024
+          8461           9.  Removed from sample prior to the 2006 data collection
+
+```{r}
+eftf1 = tracker[tracker$EFTFASSIGN==1,]
+eftf2 = tracker[tracker$EFTFASSIGN==2,]
+```
+
+```{r}
+eftf1 = eftf1[c("HHID","PN",
+                "SEX","RACE","SCHLYRS","OAGE",
+                "OALIVE","QALIVE","SALIVE",
+                "OINSAMP","QINSAMP","SINSAMP",
+                # married or living with a partner as if married
+                #1.YES 5.NO 
+                "OCOUPLE","QCOUPLE","SCOUPLE",
+                "OLBCOMP","QLBCOMP","SLBCOMP",
+                "OLIVARR","QLIVARR","SLIVARR",
+                # 1.MARRIED 2.SEPARATED/DIVORCED 
+                # 3.WIDOWED 4.NEVER MARRIED 5. UNKNOWN
+                "OMARST","QMARST","SMARST",
+                "ONURSHM","QNURSHM","SNURSHM"
+                )]
+
+eftf2 = eftf2[c("HHID","PN",
+                "SEX","RACE","SCHLYRS","NAGE",
+                "NALIVE","PALIVE","RALIVE",
+                "NINSAMP","PINSAMP","RINSAMP",
+                "NCOUPLE","PCOUPLE","RCOUPLE",
+                "NLBCOMP","PLBCOMP","RLBCOMP",
+                "NLIVARR","PLIVARR","RLIVARR",
+                "NMARST","PMARST","RMARST",
+                "NNURSHM","PNURSHM","RNURSHM"
+                )]
+```
+
+
+```{r}
+eftf1 = subset(eftf1, OINSAMP == 1) #11,737
+eftf2 = subset(eftf2, NINSAMP == 1)#12,190
+
+
+eftf1 = subset(eftf1, OALIVE == 1 | OALIVE == 2)
+eftf1 = subset(eftf1, OAGE >= 50 & OAGE != 999)
+
+eftf2 = subset(eftf2, NALIVE == 1 | NALIVE == 2)
+eftf2 = subset(eftf2, NAGE >= 50 & NAGE !=999)
+
+eftf1 #9,325
+eftf2 #9,727
+```
+
+```{r}
+randeftf1 = rand[c("HHID","PN",
+                  #PROXY 0.NO, 1.YES
+              "R12PROXY","R14PROXY","R16PROXY",
+              #MOBILITY: 0-5 SUM OF DIFFICULTY IN WALKING/CLIMBING STAIRS
+              "R12MOBILA","R14MOBILA","R16MOBILA",
+              #TOTAL WEALTH
+              "H12ATOTB","H14ATOTB","H16ATOTB",
+              #NUMBER OF PEOPLE LIVING IN THE HOUSEHOLD
+              "H12HHRES","H14HHRES","H16HHRES",
+              #NUMBER OF LIVING CHILDREN
+              "H12CHILD","H14CHILD","H16CHILD")]
+
+randeftf2 = rand[c("HHID","PN",
+                  #PROXY 0.NO, 1.YES
+              "R11PROXY","R13PROXY","R15PROXY",
+              #MOBILITY: 0-5 SUM OF DIFFICULTY IN WALKING/CLIMBING STAIRS
+              "R11MOBILA","R13MOBILA","R15MOBILA",
+              #TOTAL WEALTH
+              "H11ATOTB","H13ATOTB","H15ATOTB",
+              #NUMBER OF PEOPLE LIVING IN THE HOUSEHOLD
+              "H11HHRES","H13HHRES","H15HHRES",
+              #NUMBER OF LIVING CHILDREN
+              "H11CHILD","H13CHILD","H15CHILD")]
+```
+
+```{r}
+eftf1 <- eftf1 %>%
+  left_join(randeftf1, by = c("HHID", "PN"))
+eftf1
+
+eftf2<- eftf2 %>%
+  left_join(randeftf2, by = c("HHID", "PN"))
+eftf2
+```
+
+#LBQ Variables
+
+```{r LB data}
+lbeftf1 = readRDS("lbeftf1.rds")
+lbeftf2 = readRDS("lbeftf2.rds")
+```
+
+```{r LB Loneliness 11scale}
+reverse_lonely <- function(x) 4 - x
+
+make_loneliness <- function(data, prefix, wave, item_num = "019") {
+  items <- paste0(prefix, "LB", item_num, LETTERS[1:11])
+
+  rev_items <- paste0(prefix, "LB", item_num, c("A", "B", "C", "E"))
+
+  data %>%
+    mutate(
+      across(all_of(rev_items), reverse_lonely, .names = "rev_{.col}"),
+
+      "loneliness11.{wave}" := ifelse(
+        #IF MISSING MORE THAN 5 ITEMS => NA
+        rowSums(is.na(across(all_of(items)))) > 5,
+        NA_real_,
+        rowMeans(
+          cbind(
+            across(all_of(paste0("rev_", rev_items))),
+            across(all_of(setdiff(items, rev_items)))
+          ),
+          na.rm = TRUE
+        )
+      )
+    )
+}
+
+lbeftf1 <- lbeftf1 %>%
+  make_loneliness("O", 1, item_num = "019") %>%
+  make_loneliness("Q", 2, item_num = "019") %>%
+  make_loneliness("S", 3, item_num = "019")
+
+lbeftf2 <- lbeftf2 %>%
+  make_loneliness("N", 1, item_num = "020") %>%
+  make_loneliness("P", 2, item_num = "019") %>%
+  make_loneliness("R", 3, item_num = "019")
+
+lbeftf1 %>%
+  select(starts_with("loneliness")) %>%
+  summary()
+
+lbeftf2 %>%
+  select(starts_with("loneliness")) %>%
+  summary()
+
+lbeftf1[c("loneliness11.1","OLB019A","OLB019B","OLB019C",
+          "OLB019D","OLB019E","OLB019F","OLB019G","OLB019H","OLB019I",
+          "OLB019J","OLB019K")]
+
+summary(lbeftf1$loneliness11.1)
+summary(lbeftf2$loneliness11.1)
+
+```
+
+
+```{r}
+lbeftf1 <- lbeftf1 %>%
+  mutate(
+    haschild1 = ifelse(OLB006 == 1, 1, ifelse(OLB006 == 5, 0, NA)),
+    haschild2 = ifelse(QLB006 == 1, 1, ifelse(QLB006 == 5, 0, NA)),
+    haschild3 = ifelse(SLB006 == 1, 1, ifelse(SLB006 == 5, 0, NA)),
+    hasfriend1 = ifelse(OLB014 == 1, 1, ifelse(OLB014 == 5, 0, NA)),
+    hasfriend2 = ifelse(QLB014 == 1, 1, ifelse(QLB014 == 5, 0, NA)),
+    hasfriend3 = ifelse(SLB014 == 1, 1, ifelse(SLB014 == 5, 0, NA)),
+    livewithsp1 = ifelse(OLB003 == 1, 1, ifelse(OLB003 == 5, 0, NA)),
+    livewithsp2 = ifelse(QLB003 == 1, 1, ifelse(QLB003 == 5, 0, NA)),
+    livewithsp3 = ifelse(SLB003 == 1, 1, ifelse(SLB003 == 5, 0, NA))
+  )
+
+lbeftf2 <- lbeftf2 %>%
+  mutate(
+    haschild1 = ifelse(NLB007 == 1, 1, ifelse(NLB007 == 5, 0, NA)),
+    haschild2 = ifelse(PLB006 == 1, 1, ifelse(PLB006 == 5, 0, NA)),
+    haschild3 = ifelse(RLB006 == 1, 1, ifelse(RLB006 == 5, 0, NA)),
+    hasfriend1 = ifelse(NLB015 == 1, 1, ifelse(NLB015 == 5, 0, NA)),
+    hasfriend2 = ifelse(PLB014 == 1, 1, ifelse(PLB014 == 5, 0, NA)),
+    hasfriend3 = ifelse(RLB014 == 1, 1, ifelse(RLB014 == 5, 0, NA)),
+    livewithsp1 = ifelse(NLB004 == 1, 1, ifelse(NLB004 == 5, 0, NA)),
+    livewithsp2 = ifelse(PLB003 == 1, 1, ifelse(PLB003 == 5, 0, NA)),
+    livewithsp3 = ifelse(RLB003 == 1, 1, ifelse(RLB003 == 5, 0, NA))
+  )
+
+#lbeftf1[c("haschild1", "OLB006")]
+#lbeftf2[c("haschild1", "NLB007")]
+```
+
+```{r support & strain}
+make_social_support <- function(data, prefix, wave,
+                                spouse_num = "004",
+                                child_num  = "007",
+                                friend_num = "015") {
+
+  sp_pos <- paste0(prefix, "LB", spouse_num, c("A", "B", "C"))
+  sp_neg <- paste0(prefix, "LB", spouse_num, c("D", "E", "F", "G"))
+
+  ch_pos <- paste0(prefix, "LB", child_num, c("A", "B", "C"))
+  ch_neg <- paste0(prefix, "LB", child_num, c("D", "E", "F", "G"))
+
+  fr_pos <- paste0(prefix, "LB", friend_num, c("A", "B", "C"))
+  fr_neg <- paste0(prefix, "LB", friend_num, c("D", "E", "F", "G"))
+
+  data %>%
+    mutate(across(all_of(c(sp_pos, sp_neg, ch_pos, ch_neg, fr_pos, fr_neg)),
+                  ~ 5 - ., .names = "rev_{.col}")) %>%
+    mutate(
+      "spsupport{wave}" := ifelse(rowSums(is.na(across(all_of(sp_pos)))) > 1, NA_real_,
+                                  rowMeans(across(all_of(paste0("rev_", sp_pos))), na.rm = TRUE)),
+      "spstrain{wave}"  := ifelse(rowSums(is.na(across(all_of(sp_neg)))) > 2, NA_real_,
+                                  rowMeans(across(all_of(paste0("rev_", sp_neg))), na.rm = TRUE)),
+
+      "chsupport{wave}" := ifelse(rowSums(is.na(across(all_of(ch_pos)))) > 1, NA_real_,
+                                  rowMeans(across(all_of(paste0("rev_", ch_pos))), na.rm = TRUE)),
+      "chstrain{wave}"  := ifelse(rowSums(is.na(across(all_of(ch_neg)))) > 2, NA_real_,
+                                  rowMeans(across(all_of(paste0("rev_", ch_neg))), na.rm = TRUE)),
+
+      "frsupport{wave}" := ifelse(rowSums(is.na(across(all_of(fr_pos)))) > 1, NA_real_,
+                                  rowMeans(across(all_of(paste0("rev_", fr_pos))), na.rm = TRUE)),
+      "frstrain{wave}"  := ifelse(rowSums(is.na(across(all_of(fr_neg)))) > 2, NA_real_,
+                                  rowMeans(across(all_of(paste0("rev_", fr_neg))), na.rm = TRUE))
+    )
+}
+
+lbeftf1 <- lbeftf1 %>%
+  make_social_support("O", 1) %>%
+  make_social_support("Q", 2) %>%
+  make_social_support("S", 3)
+
+lbeftf2 <- lbeftf2 %>%
+  make_social_support("N", 1, spouse_num = "005", child_num = "008", friend_num = "016") %>%
+  make_social_support("P", 2) %>%
+  make_social_support("R", 3)
+
+
+#SANITY CHECK
+lbeftf1[c("frsupport1","frsupport2","frsupport3")]
+lbeftf2[c("frsupport1","frsupport2","frsupport3")]
+
+lbeftf1[c("frsupport1","OLB015A","OLB015B","OLB015C",
+          "frstrain1","OLB015D","OLB015E","OLB015F","OLB015G")]
+
+```
+
+                      Q09. # CHILDREN CLOSE RELATIONSHIP
+         Section: LB    Level: Respondent      Type: Numeric    Width: 2   Decimals: 0
+
+         How many of your children would you say you have a close relationship with?
+         (Please write a number in the box.)
+
+
+```{r close chilren}
+lbeftf2$numclosechild1 = lbeftf2$NLB010
+lbeftf1$numclosechild1 = lbeftf1$OLB009
+lbeftf2$numclosechild2 = lbeftf2$PLB009
+lbeftf1$numclosechild2 = lbeftf1$QLB009
+lbeftf2$numclosechild3 = lbeftf2$RLB009
+lbeftf1$numclosechild3 = lbeftf1$SLB009
+
+#Cap at 3
+lbeftf1 <- lbeftf1 %>%
+  mutate(
+    closechild1 = pmin(numclosechild1, 3),
+    closechild2 = pmin(numclosechild2, 3),
+    closechild3 = pmin(numclosechild3, 3)
+  )
+
+lbeftf2 <- lbeftf2 %>%
+  mutate(
+    closechild1 = pmin(numclosechild1, 3),
+    closechild2 = pmin(numclosechild2, 3),
+    closechild3 = pmin(numclosechild3, 3)
+  )
+```
+
+
+
+```{r lbeftf needed variables only}
+cleanlbeftf1 = lbeftf1[c("HHID","PN",
+                         "haschild1","haschild2","haschild3",
+                         "hasfriend1","hasfriend2","hasfriend3",
+                         "livewithsp1","livewithsp2","livewithsp3",
+                         "spsupport1","spsupport2","spsupport3",
+                         "chsupport1","chsupport2","chsupport3",
+                         "frsupport1","frsupport2","frsupport3",
+                         "closechild1","closechild2","closechild3",
+                         "loneliness11.1","loneliness11.2","loneliness11.3"
+                         )]
+cleanlbeftf2 = lbeftf2[c("HHID","PN",
+                         "haschild1","haschild2","haschild3",
+                         "hasfriend1","hasfriend2","hasfriend3",
+                         "livewithsp1","livewithsp2","livewithsp3",
+                         "spsupport1","spsupport2","spsupport3",
+                         "chsupport1","chsupport2","chsupport3",
+                         "frsupport1","frsupport2","frsupport3",
+                         "closechild1","closechild2","closechild3",
+                         "loneliness11.1","loneliness11.2","loneliness11.3"
+                         )]
+```
+
+
+
+```{r}
+eftf1 <- eftf1 %>%
+  left_join(cleanlbeftf1, by = c("HHID", "PN"))
+eftf1
+
+eftf2<- eftf2 %>%
+  left_join(cleanlbeftf2, by = c("HHID", "PN"))
+eftf2
+```
+
+```{r}
+names(eftf1)
+names(eftf2)
+```
+
+```{r}
+eftf1cleaned <- eftf1 %>%
+  rename(
+    gender = SEX, race = RACE, edu = SCHLYRS, baselineage = OAGE,
+    alive1 = OALIVE, alive2 = QALIVE, alive3 = SALIVE,
+    lbcomp1 = OLBCOMP, lbcomp2 = QLBCOMP, lbcomp3 = SLBCOMP,
+    couple1 = OCOUPLE, couple2 = QCOUPLE, couple3 = SCOUPLE,
+    livarr1 = OLIVARR, livarr2 = QLIVARR, livarr3 = SLIVARR,
+    mstat1 = OMARST, mstat2 = QMARST, mstat3 = SMARST,
+    numchild1 = H12CHILD, numchild2 = H14CHILD, numchild3 = H16CHILD,
+    proxy1 = R12PROXY, proxy2 = R14PROXY, proxy3 = R16PROXY,
+    mobility1 = R12MOBILA, mobility2 = R14MOBILA, mobility3 = R16MOBILA,
+    wealth1 = H12ATOTB, wealth2 = H14ATOTB, wealth3 = H16ATOTB,
+    hhsize1 = H12HHRES, hhsize2 = H14HHRES, hhsize3 = H16HHRES,
+    nursing1 = ONURSHM, nursing2 = QNURSHM, nursing3=SNURSHM
+  )
+
+eftf2cleaned <- eftf2 %>%
+  rename(
+    gender = SEX, race = RACE, edu = SCHLYRS, baselineage = NAGE,
+    alive1 = NALIVE, alive2 = PALIVE, alive3 = RALIVE,
+    couple1 = NCOUPLE, couple2 = PCOUPLE, couple3 = RCOUPLE,
+    lbcomp1 = NLBCOMP, lbcomp2 = PLBCOMP, lbcomp3 = RLBCOMP, 
+    livarr1 = NLIVARR, livarr2 = PLIVARR, livarr3 = RLIVARR,
+    mstat1 = NMARST, mstat2 = PMARST, mstat3 = RMARST,
+    numchild1 = H11CHILD, numchild2 = H13CHILD, numchild3 = H15CHILD,
+    proxy1 = R11PROXY, proxy2 = R13PROXY, proxy3 = R15PROXY,
+    mobility1 = R11MOBILA, mobility2 = R13MOBILA, mobility3 = R15MOBILA,
+    wealth1 = H11ATOTB, wealth2 = H13ATOTB, wealth3 = H15ATOTB,
+    hhsize1 = H11HHRES, hhsize2 = H13HHRES, hhsize3 = H15HHRES,
+    nursing1 = NNURSHM, nursing2 = PNURSHM, nursing3=RNURSHM
+  )
+```
+
+```{r}
+setdiff(names(eftf1cleaned), names(eftf2cleaned))
+setdiff(names(eftf2cleaned), names(eftf1cleaned))
+```
+
+```{r}
+stacked <- bind_rows(eftf1cleaned, eftf2cleaned)
+stacked$OINSAMP = NULL
+stacked$QINSAMP = NULL
+stacked$SINSAMP = NULL
+stacked$NINSAMP = NULL
+stacked$PINSAMP = NULL
+stacked$RINSAMP = NULL
+stacked
+```
+
+```{r}
+stacked <- stacked %>%
+  mutate(
+    gender = case_when(
+      gender == 1 ~ 0,
+      gender == 2 ~ 1,
+      TRUE ~ NA_real_
+    )
+  )
+stacked$white <- ifelse(
+  stacked$race == 1, 1,
+  ifelse(stacked$race %in% c(2, 7), 0, NA)
+)
+
+stacked <- stacked %>%
+  mutate(
+    wealth1 = ntile(wealth1, 5),
+    wealth2 = ntile(wealth2, 5),
+    wealth3 = ntile(wealth3, 5)
+  )
+
+stacked <- stacked %>%
+  mutate(
+    married1 = ifelse(is.na(mstat1), NA,
+                      ifelse(mstat1 == 1, 1, 0)),
+
+    married2 = ifelse(is.na(mstat2), NA,
+                      ifelse(mstat2 == 1, 1, 0)),
+
+    married3 = ifelse(is.na(mstat3), NA,
+                      ifelse(mstat3 == 1, 1, 0))
+  )
+
+stacked <- stacked %>%
+  mutate(
+    deceased = ifelse(
+      (!is.na(alive1) & !(alive1 %in% c(1, 2))) |
+      (!is.na(alive2) & !(alive2 %in% c(1, 2))) |
+      (!is.na(alive3) & !(alive3 %in% c(1, 2))), 1, 0
+    )
+  )
+
+stacked <- stacked %>%
+  mutate(
+    couple1 = ifelse(couple1 == 1, 1,
+                     ifelse(couple1 == 5, 0, NA)),
+
+    couple2 = ifelse(couple2 == 1, 1,
+                     ifelse(couple2 == 5, 0, NA)),
+
+    couple3 = ifelse(couple3 == 1, 1,
+                     ifelse(couple3 == 5, 0, NA))
+  )
+
+stacked$edu[stacked$edu == 99] <- NA
+
+table(stacked$alive1, useNA = "ifany")
+table(stacked$alive2, useNA = "ifany")
+table(stacked$alive3, useNA = "ifany")
+
+stacked
+
+
+#19,052
+saveRDS(stacked, "thesisdata_alive+deceased.rds")
+```
+
+
+```{r}
+alive <- stacked %>%
+  filter(
+    alive1 %in% c(1, 2) & alive2 %in% c(1, 2) & alive3 %in% c(1, 2) &
+    !(alive1 == 2 & alive2 == 2 & alive3 == 2)
+  )
+
+alive <- alive %>%
+  filter(
+    (proxy1 == 0 | is.na(proxy1)) &
+    (proxy2 == 0 | is.na(proxy2)) &
+    (proxy3 == 0 | is.na(proxy3))
+  )
+
+alive = alive %>%
+  filter(
+    (nursing1 == 5 | is.na(nursing1)) &
+      (nursing2 == 5 | is.na(nursing2)) &
+      (nursing3 == 5 | is.na(nursing3))
+  )
+
+alive <- alive %>%
+  filter(
+    !(lbcomp1 == 5 &
+      lbcomp2 == 5 &
+      lbcomp3 == 5)
+  )
+
+alive$proxy1 = NULL
+alive$proxy2 = NULL
+alive$proxy3 = NULL
+alive$alive1 = NULL
+alive$alive2 = NULL
+alive$alive3 = NULL
+alive$nursing1 = NULL
+alive$nursing2 = NULL
+alive$nursing3 = NULL
+alive
+#8,488
+```
+
+```{r}
+saveRDS(alive, "thesisdata_alive.rds")
+```
+
+
+```{r}
+deceased <- stacked %>%
+  filter(
+    (!is.na(alive1) & !(alive1 %in% c(1, 2))) |
+    (!is.na(alive2) & !(alive2 %in% c(1, 2))) |
+    (!is.na(alive3) & !(alive3 %in% c(1, 2)))
+  )
+deceased
+#5,019
+saveRDS(deceased, "thesisdata_deceased.rds")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
