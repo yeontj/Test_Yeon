@@ -69,18 +69,26 @@ eftf2 = tracker[tracker$EFTFASSIGN==2,]
 
 ```{r}
 eftf1 = eftf1[c("HHID","PN",
+                #HOUSEHOLD NUMBER, PERSON NUMBER
                 "SEX","RACE","SCHLYRS","OAGE",
+                #GENDER, RACE, SCHOLL YEARS, BASELINE AGE
                 "OALIVE","QALIVE","SALIVE",
+                #VITAL STATUS
                 "OINSAMP","QINSAMP","SINSAMP",
-                # married or living with a partner as if married
-                #1.YES 5.NO 
+                #IN SAMPLE
                 "OCOUPLE","QCOUPLE","SCOUPLE",
+                #COUPLE STATUS:married or living with a partner as if married
+                #1.YES 5.NO 
                 "OLBCOMP","QLBCOMP","SLBCOMP",
+                #DID COMPLETE LEAVE BEHIND QUESTIONNAIRE?
                 "OLIVARR","QLIVARR","SLIVARR",
-                # 1.MARRIED 2.SEPARATED/DIVORCED 
-                # 3.WIDOWED 4.NEVER MARRIED 5. UNKNOWN
+                #LIVING ARRANGEMENT
                 "OMARST","QMARST","SMARST",
+                #MARITAL STATUS
+                # 1.MARRIED 2.SEPARATED/DIVORCED 
+                # 3.WIDOWED 4.NEVER MARRIED 5.UNKNOWN
                 "ONURSHM","QNURSHM","SNURSHM"
+                #NURSINGHOME 
                 )]
 
 eftf2 = eftf2[c("HHID","PN",
@@ -97,11 +105,13 @@ eftf2 = eftf2[c("HHID","PN",
 
 
 ```{r}
-eftf1 = subset(eftf1, OINSAMP == 1) #11,737
-eftf2 = subset(eftf2, NINSAMP == 1)#12,190
+#PARTICIPANT IN SAMPLE AT BASELINE
+eftf1 = subset(eftf1, OINSAMP == 1) #N = 11,737
+eftf2 = subset(eftf2, NINSAMP == 1)#N = 12,190
 
-
+#PARTICIPANT ALIVE AT BASELINE
 eftf1 = subset(eftf1, OALIVE == 1 | OALIVE == 2)
+#PARTICIPANT MUST BE 50 YEARS OR OLDER
 eftf1 = subset(eftf1, OAGE >= 50 & OAGE != 999)
 
 eftf2 = subset(eftf2, NALIVE == 1 | NALIVE == 2)
@@ -117,7 +127,7 @@ randeftf1 = rand[c("HHID","PN",
               "R12PROXY","R14PROXY","R16PROXY",
               #MOBILITY: 0-5 SUM OF DIFFICULTY IN WALKING/CLIMBING STAIRS
               "R12MOBILA","R14MOBILA","R16MOBILA",
-              #TOTAL WEALTH
+              #TOTAL HOUSEHOLD WEALTH
               "H12ATOTB","H14ATOTB","H16ATOTB",
               #NUMBER OF PEOPLE LIVING IN THE HOUSEHOLD
               "H12HHRES","H14HHRES","H16HHRES",
@@ -129,7 +139,7 @@ randeftf2 = rand[c("HHID","PN",
               "R11PROXY","R13PROXY","R15PROXY",
               #MOBILITY: 0-5 SUM OF DIFFICULTY IN WALKING/CLIMBING STAIRS
               "R11MOBILA","R13MOBILA","R15MOBILA",
-              #TOTAL WEALTH
+              #TOTAL HOUSEHOLD WEALTH
               "H11ATOTB","H13ATOTB","H15ATOTB",
               #NUMBER OF PEOPLE LIVING IN THE HOUSEHOLD
               "H11HHRES","H13HHRES","H15HHRES",
@@ -328,7 +338,6 @@ lbeftf2 <- lbeftf2 %>%
 ```
 
 
-
 ```{r lbeftf needed variables only}
 cleanlbeftf1 = lbeftf1[c("HHID","PN",
                          "haschild1","haschild2","haschild3",
@@ -337,6 +346,7 @@ cleanlbeftf1 = lbeftf1[c("HHID","PN",
                          "spsupport1","spsupport2","spsupport3",
                          "chsupport1","chsupport2","chsupport3",
                          "frsupport1","frsupport2","frsupport3",
+                         "numclosechild1","numclosechild2","numclosechild3",
                          "closechild1","closechild2","closechild3",
                          "loneliness11.1","loneliness11.2","loneliness11.3"
                          )]
@@ -347,6 +357,7 @@ cleanlbeftf2 = lbeftf2[c("HHID","PN",
                          "spsupport1","spsupport2","spsupport3",
                          "chsupport1","chsupport2","chsupport3",
                          "frsupport1","frsupport2","frsupport3",
+                         "numclosechild1","numclosechild2","numclosechild3",
                          "closechild1","closechild2","closechild3",
                          "loneliness11.1","loneliness11.2","loneliness11.3"
                          )]
@@ -409,7 +420,10 @@ setdiff(names(eftf2cleaned), names(eftf1cleaned))
 ```
 
 ```{r}
+#STACK EFTF1&2
 stacked <- bind_rows(eftf1cleaned, eftf2cleaned)
+
+#ERASE NOT NEEDED COL
 stacked$OINSAMP = NULL
 stacked$QINSAMP = NULL
 stacked$SINSAMP = NULL
@@ -419,20 +433,46 @@ stacked$RINSAMP = NULL
 stacked
 ```
 
-```{r}
+```{r CLEANING}
+#CLOSE CHILD RATIO
+stacked$ccratio1 = (stacked$numclosechild1/stacked$numchild1)
+stacked$ccratio2 = (stacked$numclosechild2/stacked$numchild2)
+stacked$ccratio3 = (stacked$numclosechild3/stacked$numchild3)
+
+#CAP NUMCHILD AT 5
+stacked <- stacked %>%
+  mutate(
+    numchild1 = pmin(numchild1, 5),
+    numchild2 = pmin(numchild2, 5),
+    numchild3 = pmin(numchild3, 5)
+  )
+
+#HOUSEHOLD SIZE
+#Cap at 3
+stacked <- stacked %>%
+  mutate(
+    hhsize1 = pmin(hhsize1, 3),
+    hhsize2 = pmin(hhsize2, 3),
+    hhsize3 = pmin(hhsize3, 3)
+  )
+
+#GENDER
 stacked <- stacked %>%
   mutate(
     gender = case_when(
-      gender == 1 ~ 0,
-      gender == 2 ~ 1,
+      gender == 1 ~ 0, # 0.MALE 
+      gender == 2 ~ 1, # 1.FEMALE
       TRUE ~ NA_real_
     )
   )
+
+#WHITE/NON-WHITE
 stacked$white <- ifelse(
-  stacked$race == 1, 1,
+  stacked$race == 1, 1, # 0.NON-WHITE 1.WHITE
   ifelse(stacked$race %in% c(2, 7), 0, NA)
 )
 
+#QUINTILE WEALTH
 stacked <- stacked %>%
   mutate(
     wealth1 = ntile(wealth1, 5),
@@ -440,6 +480,8 @@ stacked <- stacked %>%
     wealth3 = ntile(wealth3, 5)
   )
 
+#SIMPLIFIY MARITAL STATUS INTO 0.NOT MARRIED 1.MARRIED
+#NOT MARRIED INCLUDING NEVER MARRIED, WIDOWED, DIVORCED, ETC.
 stacked <- stacked %>%
   mutate(
     married1 = ifelse(is.na(mstat1), NA,
@@ -452,6 +494,7 @@ stacked <- stacked %>%
                       ifelse(mstat3 == 1, 1, 0))
   )
 
+#VITAL STATUS
 stacked <- stacked %>%
   mutate(
     deceased = ifelse(
@@ -461,6 +504,7 @@ stacked <- stacked %>%
     )
   )
 
+#COUPLE STATUS
 stacked <- stacked %>%
   mutate(
     couple1 = ifelse(couple1 == 1, 1,
@@ -473,6 +517,7 @@ stacked <- stacked %>%
                      ifelse(couple3 == 5, 0, NA))
   )
 
+#SCHOOL YEARS
 stacked$edu[stacked$edu == 99] <- NA
 
 table(stacked$alive1, useNA = "ifany")
@@ -483,7 +528,7 @@ stacked
 
 
 #19,052
-saveRDS(stacked, "thesisdata_alive+deceased.rds")
+saveRDS(stacked, "thesisdata_stacked.rds")
 ```
 
 
