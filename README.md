@@ -1,3 +1,3 @@
-# Test_Yeon
-Test_delete
-How to use GitHub?
+# Master's Thesis Data Analysis 
+by Jungyeon Suh
+Using R and lavaan package, HRS data will be analyzed. 
