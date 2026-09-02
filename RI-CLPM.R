@@ -180,28 +180,3 @@ GORICA_free <- goric(
 GORICA_free
 
 
-#COMPARE MODELS
-lavTestLRT(
-  fit_free,
-  fit_constrained,
-  method = "satorra.bentler.2001")
-
-fitMeasures(
-  fit_free,
-  c(
-    "chisq.scaled", "df.scaled", "pvalue.scaled",
-    "cfi.robust", "tli.robust",
-    "rmsea.robust", "srmr",
-    "aic", "bic"
-  )
-)
-
-fitMeasures(
-  fit_constrained,
-  c(
-    "chisq.scaled", "df.scaled", "pvalue.scaled",
-    "cfi.robust", "tli.robust",
-    "rmsea.robust", "srmr",
-    "aic", "bic"
-  )
-)
